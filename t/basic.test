@@ -1,0 +1,134 @@
+#include <cxxtest/TestSuite.h>
+
+#include <grokregex.hpp>
+#include <grokmatch.hpp>
+
+#include <sstream>
+
+class GrokTestSuite : public CxxTest::TestSuite {
+  public:
+    void testSearchWithPlainString() {
+      string input = "hello";
+      GrokRegex<sregex> gre(input);
+      GrokMatch<sregex> gm;
+      bool success;
+      GrokMatch<sregex>::match_map_type m;
+
+      success = gre.Search(input, gm);
+      TS_ASSERT(success);
+      m = gm.GetMatches();
+      TS_ASSERT(m["=MATCH"] == input);
+    }
+
+    void testSearchWithPatternString() {
+      string input = "hello";
+      string regex = "%GREETING%";
+      GrokRegex<sregex> gre(regex);
+      GrokMatch<sregex> gm;
+      GrokMatch<sregex>::match_map_type m;
+      bool success;
+      
+      GrokPatternSet<sregex> pset;
+      pset.AddPattern("GREETING", "hello");
+
+      /* We should fail matching before we add the pattern set */
+      success = gre.Search(input, gm);
+      TS_ASSERT(!success);
+
+      gre.AddPatternSet(pset);
+      success = gre.Search(input, gm);
+      TS_ASSERT(success)
+      m = gm.GetMatches();
+      TS_ASSERT(m["=MATCH"] == input);
+      TS_ASSERT(m["GREETING"] == input);
+    }
+
+    void _testSearchIntPredicate(int *values, size_t nvalues, string predicate,
+                                 bool should_succeed) {
+      string regex = "%INT" + predicate + "%";
+      stringstream ss(stringstream::out | stringstream::in);
+      GrokRegex<sregex> gre(regex);
+      GrokMatch<sregex> gm;
+      GrokMatch<sregex>::match_map_type m;
+      
+      GrokPatternSet<sregex> pset;
+      pset.AddPattern("INT", "(?:[+-]?\\b(?:[0-9]+))\\b");
+      //pset.AddPattern("INT", "(?:[+-]?(?:[0-9]+))");
+      gre.AddPatternSet(pset);
+
+      /* Build a stream of inputs to test (converting to strings) */
+      for (int i = 0; i < nvalues; i++) {
+        ss << values[i] << endl;
+      }
+
+      string data;
+      while (getline(ss, data)) {
+        stringstream msg(stringstream::out);
+        bool success = gre.Search(data, gm);
+        if (success != should_succeed) {
+          msg << "Predicate test (" << data << " " << predicate << ") " 
+            << (success ? "succeeded" : "failed")
+            << " when it should have " 
+            << (should_succeed ? "succeeded" : "failed")
+            << ".";
+          TS_FAIL(msg.str());
+        }
+      }
+
+    }
+
+    void testSearchLessthanPredicateSuccess() {
+      int values[] = { -10, -1, 1, 10, -40, -31, -30 };
+      int size = sizeof(values) / sizeof(int);
+      this->_testSearchIntPredicate(values, size, "<30", true);
+    }
+
+    void testSearchLessthanPredicateFailure() {
+      int pos_values[] = { 30, 31, 40, 300, 10000};
+      int pos_size = sizeof(pos_values) / sizeof(int);
+      this->_testSearchIntPredicate(pos_values, pos_size, "<30", false);
+
+      int neg_values[] = { -30, -29, -20, -1, 3, 10, 100 };
+      int neg_size = sizeof(neg_values) / sizeof(int);
+      this->_testSearchIntPredicate(neg_values, neg_size, "<-30", false);
+    }
+
+    void testSearchGreaterthanPredicateSuccess() {
+      int values[] = { 31, 32, 50, 100 };
+      int size = sizeof(values) / sizeof(int);
+      this->_testSearchIntPredicate(values, size, ">30", true);
+    }
+
+    void testSearchGreaterthanPredicateFailure() {
+      int values[] = { -10, -1, 0, 30 };
+      int size = sizeof(values) / sizeof(int);
+      this->_testSearchIntPredicate(values, size, ">30", false);
+    }
+
+    void testSearchEqualPredicateSuccess() {
+      /* XXX: Make a better test scaffold for doing this kind of test */
+      int values[] = { -100, -10, -1, 0, 1, 10, 100 };
+      int size = sizeof(values) / sizeof(int);
+
+      /* Hack to call _testSearchIntPredicate with 1 element each time */
+      for (int i = 0; i < size; i++) {
+        stringstream data(stringstream::out);
+        data << "==" << values[i];
+        this->_testSearchIntPredicate(values + i, 1, data.str(), true);
+      }
+    }
+
+    void testSearchEqualPredicateFailure() {
+      /* XXX: Make a better test scaffold for doing this kind of test */
+      int values[] = { -100, -10, -1, 0, 1, 10, 100 };
+      int size = sizeof(values) / sizeof(int);
+
+      /* Hack to call _testSearchIntPredicate with 1 element each time */
+      for (int i = 0; i < size; i++) {
+        stringstream data(stringstream::out);
+        /* Come up with a value that is not the current value to compare against */
+        data << "==" << (values[i] + 10);
+        this->_testSearchIntPredicate(values + i, 1, data.str(), false);
+      }
+    }
+};

@@ -1,0 +1,96 @@
+#include <cxxtest/TestSuite.h>
+
+#include <grokregex.hpp>
+#include <grokmatch.hpp>
+
+#include <sstream>
+#include <fstream>
+#include <string>
+
+#include <sys/types.h>
+#include <sys/stat.h>
+
+#define INPUTDIR "input"
+
+class GrokPatternsTest : public CxxTest::TestSuite {
+  public:
+    GrokPatternSet<sregex> default_patterns;
+    GrokRegex<sregex> gre;
+    GrokMatch<sregex> gm;
+    GrokMatch<sregex>::match_map_type matchmap;
+    char *filename;
+
+    void setUp() {
+      default_patterns.LoadFromFile("../patterns");
+      this->gre.AddPatternSet(default_patterns);
+      this->filename = NULL;
+    }
+
+    void tearDown() {
+      if (this->filename != NULL)
+        free(this->filename);
+    }
+
+    void _testPatternMatch(string pattern_name, bool match_success=true) {
+      int result;
+      struct stat s;
+      this->filename = (char *)malloc(pattern_name.size() + strlen(INPUTDIR) + 10);
+      sprintf(this->filename, "%s/%s.%s\0", INPUTDIR, pattern_name.c_str(), (match_success ? "pass" : "fail"));
+      result = stat(this->filename, &s);
+      if (result == -1) {
+        //cerr << endl << "No test input for success-match on pattern: " << pattern_name << endl;
+        return;
+      }
+      //cerr << endl << "Running test for : " << pattern_name << "(input == " << 
+           //(match_success ? "pass" : "fail") << ")" << endl;
+
+      gre.SetRegex("%" + pattern_name + "%");
+      ifstream in(this->filename);
+      string line;
+      int lineno = 0;
+      while (getline(in, line)) {
+        lineno += 1;
+        bool result = gre.Search(line, gm);
+        bool as_expected = false;
+        string full_match;
+
+        as_expected = (result == match_success);
+
+        if (result) {
+          /* Test the match string if match was a success */
+          matchmap = gm.GetMatches();
+          bool line_match = (matchmap["=MATCH"] == line);
+          
+          as_expected = (match_success == line_match);
+             
+          if (!as_expected) {
+            cerr << "Match test string failure: "
+                 << (match_success 
+                     ? "Did not match entire string as required"
+                     : "Matched entire string when it should not")
+                 << endl;
+            cerr << "Match: '" << matchmap["=MATCH"] << "'" << endl;
+            cerr << "Expected: '" << line << "'" << endl;
+            cerr << "Line number: " << lineno << endl;
+            cerr << "File: " << this->filename << endl;
+            TS_FAIL("failure on match value");
+          }
+        }
+
+        if (!as_expected) {
+          cerr << "Match test failure. Expected " << match_success << " but got " << !match_success << endl;
+          cerr << " --> Pattern: " << pattern_name << endl;
+          cerr << " --> Input: " << line << endl;
+          cerr << "Line number: " << lineno << endl;
+          cerr << "File: " << this->filename << endl;
+          TS_FAIL("failure to match properly (or fail matching properly)");
+        } 
+
+        
+      }
+
+    }
+
+%PATTERN_TESTS%
+    
+};

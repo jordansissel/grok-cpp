@@ -1,0 +1,21 @@
+20080327:
+  - Added Python bindings. See pygrok/DOCUMENTATION for usage.
+  - Added test for python bindings.
+  - Added example file 'pygrok/example.py'
+
+Before releasing...
+  - Added GrokMatch::SetMatchMetaValue() which lets you inject arbitrary 
+    key-value pairs into the matchmap returned by GrokMatch::GetMatches()
+  - Added function string parsing for filters so we can accept 
+    %foo|func(arg1,arg2...)%
+  - Added a DNS filter. Default is to do an A record lookup. Examples:
+    %foo|dns% == A record lookup on %foo%
+    %foo|dns()% == A record lookup on %foo%
+    %foo|dns(A)% == A record lookup on %foo%
+    %foo|dns(AAAA)% == AAAA record lookup on %foo%
+    %foo|dns(PTR)% == PTR record lookup on %foo%
+
+    %foo|dns(PTR,A)% == does a lookup IP -(PTR)> domain name -(A)> IP
+    Basically applies PTR first, then A. Same as:
+    %foo|dns(PTR)|dns(A)%
+

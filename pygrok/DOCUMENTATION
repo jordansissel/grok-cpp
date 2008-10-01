@@ -1,0 +1,18 @@
+#pygrok usage:
+
+from pygrok import pygrok, patterns
+
+patterns = {
+  "WORD": r"\w+",
+  ...
+}
+
+g = pygrok.GrokRegex()
+g.add_patterns(patterns.base_patterns)
+g.add_patterns("FOO", "world|there")
+g.set_regex("Hello %FOO%")
+m = g.search("Hello world")
+
+# m["FOO"] == "world"
+# m["=LINE"] == "Hello world"
+# ...
